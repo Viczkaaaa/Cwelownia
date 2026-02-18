@@ -502,7 +502,14 @@ function registerPresence() {
 function renderUsers(users) {
   const list = document.getElementById('users-list');
   list.innerHTML = '';
-  Object.values(users).forEach(u => {
+  const now = Date.now();
+  const TTL = 45000; // 45s — heartbeat co 20s wiec margines
+  Object.entries(users).forEach(([uid, u]) => {
+    const age = now - (u.joinedAt || 0);
+    if (age > TTL) {
+      remove(ref(db, 'users/' + uid)).catch(() => {});
+      return;
+    }
     const tag = document.createElement('span');
     tag.className = 'utag' + (u.isHost ? ' host' : '');
     tag.textContent = (u.isHost ? '👑 ' : '') + u.name;
