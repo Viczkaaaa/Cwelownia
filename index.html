@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cwelownia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0a0f; --surface:#111118; --surface2:#1a1a24;
+    --border:#2a2a3a; --accent:#e8ff47; --accent2:#47ffe8;
+    --text:#f0f0f8; --muted:#666680; --danger:#ff4747;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:998;opacity:0.35;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");}
+
+  /* ═══ LOGIN ═══ */
+  #login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;}
+  .logo{font-size:3rem;font-weight:800;letter-spacing:-0.04em;margin-bottom:4px;text-align:center;}
+  .logo span{color:var(--accent);}
+  .logo-sub{font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--muted);margin-bottom:56px;text-align:center;letter-spacing:0.1em;text-transform:uppercase;}
+  .login-cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;max-width:640px;}
+  @media(max-width:560px){.login-cards{grid-template-columns:1fr;}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px 24px;display:flex;flex-direction:column;gap:14px;transition:border-color 0.2s;}
+  .card:hover{border-color:#3a3a50;}
+  .card-tag{font-family:'Space Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);margin-bottom:2px;}
+  .card-title{font-size:1.3rem;font-weight:800;line-height:1.1;}
+  .card-desc{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);line-height:1.6;}
+  .flabel{font-family:'Space Mono',monospace;font-size:0.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
+  .fgroup{display:flex;flex-direction:column;}
+  .finput{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 14px;color:var(--text);font-family:'Space Mono',monospace;font-size:0.8rem;outline:none;transition:border-color 0.2s;width:100%;}
+  .finput:focus{border-color:var(--accent);}
+  .finput::placeholder{color:var(--muted);}
+  .btn{background:var(--accent);color:#000;border:none;border-radius:8px;padding:12px 20px;font-weight:800;font-family:'Syne',sans-serif;font-size:0.9rem;cursor:pointer;transition:transform 0.1s,opacity 0.2s;width:100%;margin-top:4px;}
+  .btn:hover{opacity:0.85;} .btn:active{transform:scale(0.97);} .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+  .errmsg{font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--danger);min-height:16px;}
+
+  /* ═══ ROOM ═══ */
+  #room{display:none;flex-direction:column;height:100vh;}
+  header{display:flex;align-items:center;padding:13px 24px;border-bottom:1px solid var(--border);background:var(--surface);gap:12px;position:sticky;top:0;z-index:100;}
+  .hlogo{font-size:1.15rem;font-weight:800;letter-spacing:-0.02em;flex-shrink:0;}
+  .hlogo span{color:var(--accent);}
+  .hbadge{font-family:'Space Mono',monospace;font-size:0.65rem;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 10px;color:var(--muted);white-space:nowrap;}
+  .hbadge.host{border-color:rgba(232,255,71,0.4);color:var(--accent);}
+  .dot{width:7px;height:7px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;flex-shrink:0;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .hright{display:flex;gap:8px;margin-left:auto;}
+  .hbtn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-family:'Space Mono',monospace;font-size:0.63rem;cursor:pointer;transition:all 0.15s;color:var(--muted);white-space:nowrap;}
+  .hbtn:hover{border-color:var(--accent2);color:var(--accent2);}
+  .hbtn.red:hover{border-color:var(--danger);color:var(--danger);}
+
+  .main{display:grid;grid-template-columns:1fr 320px;flex:1;overflow:hidden;}
+  @media(max-width:768px){.main{grid-template-columns:1fr;grid-template-rows:240px 1fr;overflow:auto;}}
+
+  /* ═══ PLAYER ═══ */
+  .player-col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;min-height:0;}
+  @media(max-width:768px){.player-col{border-right:none;border-bottom:1px solid var(--border);}}
+
+  .player-wrap{flex:1;background:#000;position:relative;overflow:hidden;min-height:0;}
+  .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);}
+  .ph-icon{font-size:3rem;opacity:0.2;margin-bottom:10px;}
+  .ph-txt{font-family:'Space Mono',monospace;font-size:0.78rem;text-align:center;line-height:1.7;opacity:0.5;}
+
+  #yt-player{position:absolute;inset:0;width:100%;height:100%;}
+  #native-wrap{position:absolute;inset:0;display:none;background:#000;align-items:center;justify-content:center;}
+  #native-wrap video{max-width:100%;max-height:100%;}
+
+  /* Controls overlay */
+  #ctrl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.9));padding:28px 14px 12px;display:none;flex-direction:column;gap:7px;z-index:10;}
+  #ctrl.show{display:flex;}
+  .player-wrap:hover #ctrl{opacity:1;}
+
+  .prog-row{display:flex;align-items:center;gap:8px;}
+  .prog-bg{flex:1;height:4px;background:rgba(255,255,255,0.18);border-radius:2px;position:relative;cursor:pointer;transition:height 0.15s;}
+  .prog-bg:hover{height:6px;}
+  .prog-fill{height:100%;background:var(--accent);border-radius:2px;pointer-events:none;}
+  .prog-thumb{position:absolute;right:0;top:50%;transform:translate(50%,-50%);width:11px;height:11px;background:var(--accent);border-radius:50%;opacity:0;pointer-events:none;transition:opacity 0.15s;}
+  .prog-bg:hover .prog-thumb{opacity:1;}
+  .ttime{font-family:'Space Mono',monospace;font-size:0.6rem;color:rgba(255,255,255,0.75);white-space:nowrap;min-width:76px;text-align:right;}
+
+  .ctrl-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .cb{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:5px 10px;color:#fff;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+  .cb:hover{background:rgba(232,255,71,0.18);border-color:var(--accent);color:var(--accent);}
+  .cb.play{padding:5px 16px;font-size:0.9rem;}
+  .vol-wrap{display:flex;align-items:center;gap:5px;margin-left:2px;}
+  .vol-icon{font-size:0.75rem;opacity:0.7;}
+  .vol{-webkit-appearance:none;appearance:none;width:68px;height:3px;background:rgba(255,255,255,0.2);border-radius:2px;outline:none;cursor:pointer;}
+  .vol::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  .spacer{flex:1;}
+  .sync-tag{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--accent2);padding:2px 7px;background:rgba(71,255,232,0.1);border:1px solid rgba(71,255,232,0.2);border-radius:3px;opacity:0;transition:opacity 0.4s;}
+  .sync-tag.show{opacity:1;}
+  .fs-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:5px 9px;color:#fff;font-size:0.8rem;cursor:pointer;transition:all 0.15s;}
+  .fs-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .now-bar{background:var(--surface2);border-top:1px solid var(--border);padding:9px 18px;display:flex;align-items:center;gap:10px;min-height:44px;flex-shrink:0;}
+  .now-lbl{font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;}
+  .now-txt{font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+  .now-empty{color:var(--muted);}
+
+  /* ═══ SIDEBAR ═══ */
+  .sidebar{display:flex;flex-direction:column;background:var(--surface);overflow:hidden;min-height:0;}
+
+  .add-box{padding:16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .slbl{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);font-family:'Space Mono',monospace;margin-bottom:9px;}
+  .add-row{display:flex;gap:7px;}
+  .urlinput{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 11px;color:var(--text);font-family:'Space Mono',monospace;font-size:0.7rem;outline:none;transition:border-color 0.2s;min-width:0;}
+  .urlinput:focus{border-color:var(--accent);}
+  .urlinput::placeholder{color:var(--muted);}
+  .addbtn{background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 13px;font-weight:800;font-family:'Syne',sans-serif;font-size:0.82rem;cursor:pointer;transition:transform 0.1s,opacity 0.2s;flex-shrink:0;}
+  .addbtn:hover{opacity:0.85;} .addbtn:active{transform:scale(0.96);}
+  .sup-tags{margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;}
+  .stag{font-family:'Space Mono',monospace;font-size:0.56rem;padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--muted);}
+
+  .pl-wrap{flex:1;overflow-y:auto;padding:12px;}
+  .pl-wrap::-webkit-scrollbar{width:3px;}
+  .pl-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  .pl-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+  .pl-count{font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);}
+  .pl-empty{text-align:center;padding:28px 14px;color:var(--muted);font-size:0.72rem;font-family:'Space Mono',monospace;line-height:1.9;}
+
+  .pitem{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:7px;margin-bottom:5px;background:var(--surface2);border:1px solid transparent;cursor:pointer;transition:all 0.15s;animation:sIn 0.2s ease;}
+  @keyframes sIn{from{opacity:0;transform:translateX(7px)}to{opacity:1;transform:translateX(0)}}
+  .pitem:hover{border-color:var(--border);}
+  .pitem.active{border-color:var(--accent);background:rgba(232,255,71,0.05);}
+  .pitem-ico{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0;font-weight:700;font-family:'Space Mono',monospace;}
+  .ico-yt{background:rgba(255,0,0,.15);color:#ff4444;}
+  .ico-nu{background:rgba(255,165,0,.15);color:#ffa500;}
+  .pitem-info{flex:1;min-width:0;}
+  .pitem-title{font-size:0.73rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+  .pitem-url{font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pdel{width:19px;height:19px;border-radius:4px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.68rem;transition:all 0.15s;flex-shrink:0;opacity:0;}
+  .pitem:hover .pdel{opacity:1;}
+  .pdel:hover{background:rgba(255,71,71,.15);color:var(--danger);}
+
+  /* ═══ USERS PANEL ═══ */
+  .users-box{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .users-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
+  .utag{font-family:'Space Mono',monospace;font-size:0.6rem;padding:2px 8px;border-radius:3px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+  .utag.host{border-color:rgba(232,255,71,0.35);color:var(--accent);}
+
+  /* ═══ TOAST ═══ */
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:7px;font-family:'Space Mono',monospace;font-size:0.7rem;z-index:1000;transition:all 0.3s;pointer-events:none;white-space:nowrap;}
+  .toast.err{border-color:var(--danger);color:var(--danger);}
+  .toast.ok{border-color:var(--accent);color:var(--accent);}
+  .toast.info{border-color:var(--accent2);color:var(--accent2);}
+  .toast.gone{opacity:0;transform:translateX(-50%) translateY(10px);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="logo">Cwel<span>ownia</span></div>
+  <div class="logo-sub">// wybierz jak chcesz dołączyć</div>
+
+  <div class="login-cards">
+    <!-- HOST -->
+    <div class="card">
+      <div>
+        <div class="card-tag">// Admin</div>
+        <div class="card-title">Wejdź jako Host</div>
+      </div>
+      <div class="card-desc">Pełna kontrola nad odtwarzaczem. Tylko jedna osoba może być hostem.</div>
+      <div class="fgroup">
+        <div class="flabel">Hasło hosta</div>
+        <input class="finput" id="host-pass" type="password" placeholder="wpisz hasło" />
+      </div>
+      <div class="errmsg" id="host-err"></div>
+      <button class="btn" id="host-btn" onclick="loginHost()">Wejdź jako Host →</button>
+    </div>
+
+    <!-- GUEST -->
+    <div class="card">
+      <div>
+        <div class="card-tag">// Gość</div>
+        <div class="card-title">Wejdź jako Gość</div>
+      </div>
+      <div class="card-desc">Możesz oglądać i dodawać filmy do playlisty.</div>
+      <div class="fgroup">
+        <div class="flabel">Twoja nazwa</div>
+        <input class="finput" id="guest-name" type="text" placeholder="np. Ziomek123" maxlength="24" />
+      </div>
+      <div class="errmsg" id="guest-err"></div>
+      <button class="btn" id="guest-btn" onclick="loginGuest()">Wejdź jako Gość →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ROOM -->
+<div id="room">
+  <header>
+    <div class="hlogo">Cwel<span>ownia</span></div>
+    <span class="dot"></span>
+    <span class="hbadge" id="h-role">...</span>
+    <div class="hright">
+      <button class="hbtn red" onclick="leaveRoom()">✕ Wyjdź</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- Player -->
+    <div class="player-col">
+      <div class="player-wrap" id="player-wrap">
+        <div class="ph" id="ph">
+          <div class="ph-icon">▶</div>
+          <div class="ph-txt">Dodaj link do playlisty<br>aby zacząć oglądać</div>
+        </div>
+        <div id="yt-player"></div>
+        <div id="native-wrap"><video id="native-vid" playsinline></video></div>
+
+        <!-- Controls -->
+        <div id="ctrl">
+          <div class="prog-row">
+            <div class="prog-bg" id="prog-bg">
+              <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+              <div class="prog-thumb"></div>
+            </div>
+            <span class="ttime" id="ttime">0:00 / 0:00</span>
+          </div>
+          <div class="ctrl-row">
+            <button class="cb play" id="playbtn" onclick="togglePlay()">▶</button>
+            <button class="cb" id="skip-prev" onclick="hostPrev()">⏮</button>
+            <button class="cb" id="skip-back" onclick="seekRel(-5)">«5s</button>
+            <button class="cb" id="skip-fwd" onclick="seekRel(5)">5s»</button>
+            <button class="cb" id="skip-next" onclick="hostNext()">⏭</button>
+            <div class="vol-wrap">
+              <span class="vol-icon">🔊</span>
+              <input type="range" class="vol" id="vol" min="0" max="100" value="100" oninput="setVol(this.value)">
+            </div>
+            <div class="spacer"></div>
+            <span class="sync-tag" id="synctag">↺ sync</span>
+            <button class="fs-btn" onclick="goFs()">⛶</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="now-bar">
+        <span class="now-lbl">▶ Teraz</span>
+        <span class="now-txt now-empty" id="now-txt">Nic nie jest odtwarzane</span>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="users-box">
+        <div class="slbl">// Online</div>
+        <div class="users-list" id="users-list"></div>
+      </div>
+
+      <div class="add-box">
+        <div class="slbl">// Dodaj link</div>
+        <div class="add-row">
+          <input type="text" class="urlinput" id="url-inp" placeholder="YouTube lub nuuls link..." />
+          <button class="addbtn" onclick="addUrl()">+</button>
+        </div>
+        <div class="sup-tags">
+          <span class="stag">YouTube</span>
+          <span class="stag">i.nuuls</span>
+        </div>
+      </div>
+
+      <div class="pl-wrap">
+        <div class="pl-head">
+          <div class="slbl" style="margin:0">// Playlista</div>
+          <span class="pl-count" id="pl-count">0 filmów</span>
+        </div>
+        <div id="playlist"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast gone" id="toast"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, get, onValue, update, remove, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ── Firebase ──
+const app = initializeApp({
+  apiKey: "AIzaSyDT9CdbDWDE15il4ce8tEHmO3Izh1KwSlA",
+  authDomain: "cwelownia-watch.firebaseapp.com",
+  databaseURL: "https://cwelownia-watch-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "cwelownia-watch",
+  storageBucket: "cwelownia-watch.firebasestorage.app",
+  messagingSenderId: "882490536395",
+  appId: "1:882490536395:web:1ab1921e9b17f02044464e"
+});
+const db = getDatabase(app);
+
+// ── Constants ──
+const HOST_PASSWORD = 'cwel';
+const HOST_NAME = 'MelaPustelnik';
+const ROOM_ID = 'main';
+
+// ── State ──
+let isHost = false;
+let myName = '';
+let myUid = null;
+let playlist = [];
+let currentIndex = -1;
+let unsubRoom = null;
+let unsubUsers = null;
+
+// Player
+let ytPlayer = null;
+let currentPlatform = null; // 'youtube' | 'native'
+let isPlaying = false;
+let currentDuration = 0;
+let progressTimer = null;
+let heartbeatTimer = null;
+let syncDebounce = null;
+let ignoreState = false;
+let lastSyncedState = null;
+
+// ── Toast ──
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.className='toast gone', 3000);
+}
+
+// ── SHA256 ──
+async function sha256(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── UID ──
+function getUid() {
+  let uid = sessionStorage.getItem('cwel_uid');
+  if (!uid) { uid = Math.random().toString(36).substr(2,10); sessionStorage.setItem('cwel_uid', uid); }
+  return uid;
+}
+
+// ── Platform ──
+function detectPlatform(url) {
+  try {
+    const h = new URL(url).hostname.replace('www.','');
+    if (h.includes('youtube.com') || h.includes('youtu.be')) return 'youtube';
+    if (h.includes('i.nuuls.com') || h.includes('nuuls.com')) return 'nuuls';
+  } catch(e) {}
+  return null;
+}
+
+function getYtId(url) {
+  const pp = [/youtu\.be\/([^?&#/]+)/, /youtube\.com\/watch\?.*v=([^&#]+)/, /youtube\.com\/shorts\/([^?&#]+)/];
+  for (const p of pp) { const m = url.match(p); if (m) return m[1]; }
+  return null;
+}
+
+function getTitle(url, platform) {
+  try {
+    if (platform === 'youtube') { const id = getYtId(url); return id ? 'YouTube · '+id : 'YouTube'; }
+    return new URL(url).pathname.split('/').filter(Boolean).pop() || url;
+  } catch(e) { return url; }
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── YT API ──
+window.onYouTubeIframeAPIReady = () => {};
+
+// ── LOGIN ──
+window.loginHost = async function() {
+  const pass = document.getElementById('host-pass').value;
+  const err = document.getElementById('host-err');
+  const btn = document.getElementById('host-btn');
+  if (!pass) { err.textContent = 'Podaj hasło'; return; }
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Sprawdzam...';
+  const hash = await sha256(pass);
+  const correctHash = await sha256(HOST_PASSWORD);
+  if (hash !== correctHash) {
+    err.textContent = 'Złe hasło';
+    btn.disabled = false; btn.textContent = 'Wejdź jako Host →';
+    return;
+  }
+  isHost = true; myName = HOST_NAME;
+  myUid = 'host_' + getUid();
+  enterRoom();
+};
+
+window.loginGuest = async function() {
+  const name = document.getElementById('guest-name').value.trim();
+  const err = document.getElementById('guest-err');
+  if (!name) { err.textContent = 'Podaj nazwę użytkownika'; return; }
+  if (name.toLowerCase() === HOST_NAME.toLowerCase()) { err.textContent = 'Ta nazwa jest zarezerwowana'; return; }
+  err.textContent = '';
+  isHost = false; myName = name;
+  myUid = 'guest_' + getUid();
+  enterRoom();
+};
+
+// ── ENTER ROOM ──
+function enterRoom() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('room').style.display = 'flex';
+
+  const roleEl = document.getElementById('h-role');
+  roleEl.textContent = isHost ? '👑 ' + myName : '👤 ' + myName;
+  roleEl.className = 'hbadge' + (isHost ? ' host' : '');
+
+  // Controls visibility
+  setupControls();
+  clearPlayer();
+
+  // Register presence
+  registerPresence();
+
+  // Subscribe to room
+  if (unsubRoom) unsubRoom();
+  unsubRoom = onValue(ref(db, 'room'), snap => {
+    if (!snap.exists()) {
+      // Initialize room if empty (host)
+      if (isHost) {
+        set(ref(db, 'room'), { playlist: [], currentIndex: -1, playerState: null });
+      }
+      return;
+    }
+    const data = snap.val();
+    const newPlaylist = data.playlist ? (Array.isArray(data.playlist) ? data.playlist : Object.values(data.playlist)) : [];
+    const newIndex = typeof data.currentIndex === 'number' ? data.currentIndex : -1;
+    const newState = data.playerState || null;
+
+    const idxChanged = newIndex !== currentIndex;
+    const plChanged = JSON.stringify(newPlaylist) !== JSON.stringify(playlist);
+
+    playlist = newPlaylist;
+
+    if (idxChanged) {
+      currentIndex = newIndex;
+      renderPlaylist();
+      if (currentIndex >= 0 && currentIndex < playlist.length) {
+        loadPlayer(playlist[currentIndex]);
+        if (!isHost && newState) {
+          setTimeout(() => applyState(newState, true), 1800);
+        }
+      } else {
+        clearPlayer();
+      }
+    } else if (plChanged) {
+      renderPlaylist();
+    }
+
+    // Sync for guests
+    if (!isHost && newState && !idxChanged) {
+      const ns = JSON.stringify(newState);
+      if (JSON.stringify(lastSyncedState) !== ns) {
+        const prevPlaying = lastSyncedState ? lastSyncedState.playing : null;
+        lastSyncedState = newState;
+        const forceSync = prevPlaying !== null && prevPlaying !== newState.playing;
+        applyState(newState, forceSync);
+      }
+    }
+  });
+
+  // Subscribe to users
+  if (unsubUsers) unsubUsers();
+  unsubUsers = onValue(ref(db, 'users'), snap => {
+    const users = snap.val() || {};
+    renderUsers(users);
+  });
+}
+
+// ── PRESENCE ──
+function registerPresence() {
+  const userRef = ref(db, 'users/' + myUid);
+  set(userRef, { name: myName, isHost, joinedAt: Date.now() });
+  // Clean up on disconnect handled via onDisconnect
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js').then(({ onDisconnect }) => {
+    onDisconnect(userRef).remove();
+  });
+}
+
+function renderUsers(users) {
+  const list = document.getElementById('users-list');
+  list.innerHTML = '';
+  Object.values(users).forEach(u => {
+    const tag = document.createElement('span');
+    tag.className = 'utag' + (u.isHost ? ' host' : '');
+    tag.textContent = (u.isHost ? '👑 ' : '') + u.name;
+    list.appendChild(tag);
+  });
+}
+
+// ── LEAVE ──
+window.leaveRoom = function() {
+  if (unsubRoom) { unsubRoom(); unsubRoom = null; }
+  if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+  if (myUid) remove(ref(db, 'users/' + myUid));
+  stopTimers();
+  clearPlayer();
+  isHost = false; myName = ''; myUid = null;
+  playlist = []; currentIndex = -1; lastSyncedState = null;
+  document.getElementById('room').style.display = 'none';
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('host-pass').value = '';
+  document.getElementById('guest-name').value = '';
+  document.getElementById('host-err').textContent = '';
+  document.getElementById('guest-err').textContent = '';
+  document.getElementById('host-btn').disabled = false;
+  document.getElementById('host-btn').textContent = 'Wejdź jako Host →';
+};
+
+// ── SETUP CONTROLS ──
+function setupControls() {
+  // Host: full controls. Guest: only volume + fullscreen
+  const hostOnly = ['playbtn', 'skip-prev', 'skip-back', 'skip-fwd', 'skip-next'];
+  hostOnly.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isHost ? '' : 'none';
+  });
+  document.getElementById('prog-bg').style.cursor = isHost ? 'pointer' : 'default';
+}
+
+// ── ADD URL ──
+window.addUrl = async function() {
+  const inp = document.getElementById('url-inp');
+  const url = inp.value.trim();
+  if (!url) return;
+  const platform = detectPlatform(url);
+  if (!platform) { toast('Tylko YouTube i i.nuuls!', 'err'); return; }
+  const item = { url, platform, title: getTitle(url, platform) };
+  const newPl = [...playlist, item];
+  const newIdx = playlist.length === 0 ? 0 : currentIndex;
+  try {
+    await update(ref(db, 'room'), { playlist: newPl, currentIndex: newIdx });
+    inp.value = '';
+    toast('Dodano ✓', 'ok');
+  } catch(e) { toast('Błąd zapisu', 'err'); }
+};
+
+// ── RENDER PLAYLIST ──
+function renderPlaylist() {
+  const el = document.getElementById('playlist');
+  const n = playlist.length;
+  document.getElementById('pl-count').textContent = n + ' ' + (n===1?'film':n<5?'filmy':'filmów');
+  if (n === 0) { el.innerHTML = '<div class="pl-empty">// pusto<br>dodaj link powyżej</div>'; return; }
+  el.innerHTML = '';
+  playlist.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'pitem' + (i === currentIndex ? ' active' : '');
+    const ico = item.platform === 'youtube' ? 'ico-yt' : 'ico-nu';
+    const lbl = item.platform === 'youtube' ? 'YT' : 'NU';
+    div.innerHTML = `
+      <div class="pitem-ico ${ico}">${lbl}</div>
+      <div class="pitem-info">
+        <div class="pitem-title">${esc(item.title)}</div>
+        <div class="pitem-url">${esc(item.url)}</div>
+      </div>
+      ${isHost ? `<button class="pdel" data-i="${i}">✕</button>` : ''}
+    `;
+    if (isHost) {
+      div.addEventListener('click', () => setIdx(i));
+      const del = div.querySelector('.pdel');
+      if (del) del.addEventListener('click', e => { e.stopPropagation(); delItem(i); });
+    } else {
+      div.style.cursor = 'default';
+    }
+    el.appendChild(div);
+  });
+}
+
+async function setIdx(i) {
+  if (!isHost) return;
+  try { await update(ref(db, 'room'), { currentIndex: i }); } catch(e) {}
+}
+
+async function delItem(i) {
+  if (!isHost) return;
+  const np = [...playlist]; np.splice(i, 1);
+  let ni = currentIndex;
+  if (i === currentIndex) ni = np.length > 0 ? Math.min(i, np.length-1) : -1;
+  else if (i < currentIndex) ni = currentIndex - 1;
+  try { await update(ref(db, 'room'), { playlist: np, currentIndex: ni }); } catch(e) {}
+}
+
+// ── HOST NAV ──
+window.hostNext = function() { if (!isHost || currentIndex >= playlist.length-1) return; setIdx(currentIndex+1); };
+window.hostPrev = function() { if (!isHost || currentIndex <= 0) return; setIdx(currentIndex-1); };
+
+// ── FIREBASE PLAYER STATE ──
+async function pushState(playing, time) {
+  if (!isHost || !myUid) return;
+  clearTimeout(syncDebounce);
+  syncDebounce = setTimeout(async () => {
+    try {
+      await update(ref(db, 'room/playerState'), {
+        playing, time: parseFloat((time||0).toFixed(2)),
+        updatedAt: Date.now(), itemIndex: currentIndex
+      });
+    } catch(e) {}
+  }, 150);
+}
+
+function startHeartbeat() {
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    if (!isHost) return;
+    let playing = false, time = 0;
+    if (currentPlatform === 'youtube' && ytPlayer) {
+      try { playing = ytPlayer.getPlayerState() === 1; time = ytPlayer.getCurrentTime() || 0; } catch(e) {}
+    } else if (currentPlatform === 'native') {
+      const v = document.getElementById('native-vid');
+      if (v) { playing = !v.paused; time = v.currentTime || 0; }
+    }
+    pushState(playing, time);
+  }, 3000);
+}
+
+function applyState(state, force=false) {
+  if (!state || isHost) return;
+  const { playing, time, updatedAt, itemIndex } = state;
+  if (typeof itemIndex === 'number' && itemIndex !== currentIndex) return;
+
+  const lag = (Date.now() - (updatedAt||Date.now())) / 1000;
+  const target = (time||0) + (playing ? lag : 0);
+
+  let guestTime = 0;
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    try { guestTime = ytPlayer.getCurrentTime() || 0; } catch(e) {}
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid'); if (v) guestTime = v.currentTime || 0;
+  }
+
+  const drift = Math.abs(guestTime - target);
+  if (!force && drift <= 3 && playing) return;
+
+  flashSync();
+  ignoreState = true;
+
+  if (currentPlatform === 'youtube' && ytPlayer && typeof ytPlayer.seekTo === 'function') {
+    try {
+      if (force || drift > 3) ytPlayer.seekTo(target, true);
+      playing ? ytPlayer.playVideo() : ytPlayer.pauseVideo();
+    } catch(e) {}
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid');
+    if (v) {
+      if (force || drift > 3) v.currentTime = Math.max(0, target);
+      playing ? v.play().catch(()=>{}) : v.pause();
+    }
+  }
+  setTimeout(() => { ignoreState = false; }, 600);
+}
+
+function flashSync() {
+  const el = document.getElementById('synctag');
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+// ── PLAYER ──
+function clearPlayer() {
+  stopTimers();
+  currentPlatform = null; isPlaying = false; currentDuration = 0;
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('ttime').textContent = '0:00 / 0:00';
+  document.getElementById('playbtn').textContent = '▶';
+  document.getElementById('native-wrap').style.display = 'none';
+  document.getElementById('native-vid').src = '';
+  document.getElementById('ctrl').classList.remove('show');
+  document.getElementById('ph').style.display = 'flex';
+
+  if (ytPlayer && typeof ytPlayer.destroy === 'function') {
+    try { ytPlayer.destroy(); } catch(e) {}
+    ytPlayer = null;
+    const old = document.getElementById('yt-player');
+    const fresh = document.createElement('div'); fresh.id = 'yt-player';
+    old.replaceWith(fresh);
+  }
+
+  const np = document.getElementById('now-txt');
+  np.textContent = 'Nic nie jest odtwarzane'; np.className = 'now-txt now-empty';
+}
+
+function loadPlayer(item) {
+  clearPlayer();
+  document.getElementById('ph').style.display = 'none';
+  document.getElementById('ctrl').classList.add('show');
+  const np = document.getElementById('now-txt');
+  np.textContent = item.title; np.className = 'now-txt';
+
+  if (item.platform === 'youtube') {
+    currentPlatform = 'youtube';
+    const vid = getYtId(item.url);
+    if (!vid) { toast('Błąd ID YouTube','err'); return; }
+    const tryCreate = () => {
+      if (!window.YT || !window.YT.Player) { setTimeout(tryCreate, 200); return; }
+      ytPlayer = new window.YT.Player('yt-player', {
+        videoId: vid,
+        playerVars: { autoplay:1, rel:0, modestbranding:1, controls:0, disablekb:1, iv_load_policy:3 },
+        events: {
+          onReady: e => { e.target.playVideo(); startTimers(); },
+          onStateChange: e => {
+            if (ignoreState) return;
+            if (isHost) {
+              const pl = e.data === window.YT.PlayerState.PLAYING;
+              const pa = e.data === window.YT.PlayerState.PAUSED;
+              if (pl || pa) { try { pushState(pl, ytPlayer.getCurrentTime()||0); } catch(err){} }
+            }
+          }
+        }
+      });
+    };
+    tryCreate();
+    return;
+  }
+
+  if (item.platform === 'nuuls') {
+    currentPlatform = 'native';
+    const nw = document.getElementById('native-wrap');
+    nw.style.display = 'flex';
+    const v = document.getElementById('native-vid');
+    v.src = item.url; v.controls = false;
+    v.addEventListener('play', () => { if (!ignoreState && isHost) pushState(true, v.currentTime); });
+    v.addEventListener('pause', () => { if (!ignoreState && isHost) pushState(false, v.currentTime); });
+    v.addEventListener('seeked', () => { if (!ignoreState && isHost) pushState(!v.paused, v.currentTime); });
+    v.play().catch(()=>{});
+    startTimers();
+    return;
+  }
+}
+
+// ── PROGRESS ──
+function startTimers() {
+  clearInterval(progressTimer);
+  progressTimer = setInterval(tickProgress, 500);
+  if (isHost) startHeartbeat();
+}
+
+function stopTimers() {
+  clearInterval(progressTimer); progressTimer = null;
+  clearInterval(heartbeatTimer); heartbeatTimer = null;
+}
+
+function tickProgress() {
+  let ct = 0, dur = 0;
+  if (currentPlatform === 'youtube' && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+    try {
+      ct = ytPlayer.getCurrentTime() || 0;
+      dur = ytPlayer.getDuration() || 0;
+      isPlaying = ytPlayer.getPlayerState() === 1;
+    } catch(e) {}
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid');
+    if (v) { ct = v.currentTime||0; dur = v.duration||0; isPlaying = !v.paused; }
+  }
+  currentDuration = dur;
+  const pct = dur > 0 ? (ct/dur)*100 : 0;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('ttime').textContent = fmt(ct) + ' / ' + fmt(dur);
+  document.getElementById('playbtn').textContent = isPlaying ? '⏸' : '▶';
+}
+
+function fmt(s) {
+  if (!isFinite(s)||s<0) return '0:00';
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return m + ':' + (sec<10?'0':'') + sec;
+}
+
+// ── CONTROLS ──
+window.togglePlay = function() {
+  if (!isHost) return;
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    const st = ytPlayer.getPlayerState();
+    if (st === 1) { ytPlayer.pauseVideo(); pushState(false, ytPlayer.getCurrentTime()); }
+    else { ytPlayer.playVideo(); pushState(true, ytPlayer.getCurrentTime()); }
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid'); if (!v) return;
+    if (v.paused) { v.play(); pushState(true, v.currentTime); }
+    else { v.pause(); pushState(false, v.currentTime); }
+  }
+};
+
+window.seekRel = function(sec) {
+  if (!isHost) return;
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    const t = Math.max(0, (ytPlayer.getCurrentTime()||0)+sec);
+    ytPlayer.seekTo(t, true);
+    pushState(ytPlayer.getPlayerState()===1, t);
+    toast((sec>0?'+':'')+sec+'s', 'ok');
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid'); if (!v) return;
+    v.currentTime = Math.max(0, v.currentTime+sec);
+    pushState(!v.paused, v.currentTime);
+    toast((sec>0?'+':'')+sec+'s', 'ok');
+  }
+};
+
+window.setVol = function(val) {
+  const v = parseInt(val);
+  if (currentPlatform === 'youtube' && ytPlayer) ytPlayer.setVolume(v);
+  else if (currentPlatform === 'native') {
+    const vid = document.getElementById('native-vid'); if (vid) vid.volume = v/100;
+  }
+};
+
+window.goFs = function() {
+  const w = document.getElementById('player-wrap');
+  document.fullscreenElement ? document.exitFullscreen() : w.requestFullscreen().catch(()=>{});
+};
+
+// Progress click
+const progBg = document.getElementById('prog-bg');
+let dragging = false;
+function seekFraction(f) {
+  if (!isHost || currentDuration <= 0) return;
+  const t = f * currentDuration;
+  if (currentPlatform === 'youtube' && ytPlayer) { ytPlayer.seekTo(t, true); pushState(ytPlayer.getPlayerState()===1, t); }
+  else if (currentPlatform === 'native') { const v=document.getElementById('native-vid'); if(v){v.currentTime=t;pushState(!v.paused,t);} }
+}
+progBg.addEventListener('mousedown', e => {
+  if (!isHost) return;
+  dragging = true;
+  const r = progBg.getBoundingClientRect();
+  seekFraction(Math.max(0, Math.min(1, (e.clientX-r.left)/r.width)));
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging||!isHost) return;
+  const r = progBg.getBoundingClientRect();
+  seekFraction(Math.max(0, Math.min(1, (e.clientX-r.left)/r.width)));
+});
+document.addEventListener('mouseup', () => { dragging = false; });
+
+// ── KEYBOARD ──
+document.getElementById('url-inp').addEventListener('keydown', e => { if(e.key==='Enter') window.addUrl(); });
+document.getElementById('host-pass').addEventListener('keydown', e => { if(e.key==='Enter') window.loginHost(); });
+document.getElementById('guest-name').addEventListener('keydown', e => { if(e.key==='Enter') window.loginGuest(); });
+
+</script>
+</body>
+</html>
