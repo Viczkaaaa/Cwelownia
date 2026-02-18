@@ -128,6 +128,7 @@
   .pitem-ico{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0;font-weight:700;font-family:'Space Mono',monospace;}
   .ico-yt{background:rgba(255,0,0,.15);color:#ff4444;}
   .ico-nu{background:rgba(255,165,0,.15);color:#ffa500;}
+  .ico-voe{background:rgba(150,100,255,.15);color:#9664ff;}
   .pitem-info{flex:1;min-width:0;}
   .pitem-title{font-size:0.73rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
   .pitem-url{font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -263,6 +264,7 @@
         <div class="sup-tags">
           <span class="stag">YouTube</span>
           <span class="stag">i.nuuls</span>
+          <span class="stag">voe.sx</span>
         </div>
       </div>
 
@@ -353,6 +355,7 @@ function detectPlatform(url) {
     const h = new URL(url).hostname.replace('www.','');
     if (h.includes('youtube.com') || h.includes('youtu.be')) return 'youtube';
     if (h.includes('i.nuuls.com') || h.includes('nuuls.com')) return 'nuuls';
+    if (h.includes('voe.sx')) return 'voe';
 
   } catch(e) {}
   return null;
@@ -367,6 +370,7 @@ function getYtId(url) {
 function getTitle(url, platform) {
   try {
     if (platform === 'youtube') { const id = getYtId(url); return id ? 'YouTube · '+id : 'YouTube'; }
+    if (platform === 'voe') { try { const p = new URL(url).pathname.split('/').filter(Boolean); return 'Voe · ' + p[p.length-1]; } catch(e) {} }
     return new URL(url).pathname.split('/').filter(Boolean).pop() || url;
   } catch(e) { return url; }
 }
@@ -564,8 +568,8 @@ function renderPlaylist() {
   playlist.forEach((item, i) => {
     const div = document.createElement('div');
     div.className = 'pitem' + (i === currentIndex ? ' active' : '');
-    const icoMap = { youtube:'ico-yt', nuuls:'ico-nu' };
-    const lblMap = { youtube:'YT', nuuls:'NU' };
+    const icoMap = { youtube:'ico-yt', nuuls:'ico-nu', voe:'ico-voe' };
+    const lblMap = { youtube:'YT', nuuls:'NU', voe:'VO' };
     const ico = icoMap[item.platform] || 'ico-nu';
     const lbl = lblMap[item.platform] || '??';
     div.innerHTML = `
@@ -691,6 +695,8 @@ function clearPlayer() {
 
   const stIframe = document.getElementById('st-iframe');
   if (stIframe) stIframe.remove();
+  const voeIframe = document.getElementById('voe-iframe');
+  if (voeIframe) voeIframe.remove();
 
   if (ytPlayer && typeof ytPlayer.destroy === 'function') {
     try { ytPlayer.destroy(); } catch(e) {}
@@ -737,6 +743,26 @@ function loadPlayer(item) {
     return;
   }
 
+
+  if (item.platform === 'voe') {
+    currentPlatform = 'voe-iframe';
+    // Extract ID from URL: voe.sx/{id} or voe.sx/e/{id}
+    let embedUrl = '';
+    try {
+      const parts = new URL(item.url).pathname.split('/').filter(Boolean);
+      // if already /e/{id} use as-is, otherwise build embed
+      const id = parts[parts.length - 1];
+      embedUrl = 'https://voe.sx/e/' + id;
+    } catch(e) { toast('Błąd URL Voe','err'); return; }
+    const iframeEl = document.createElement('iframe');
+    iframeEl.id = 'voe-iframe';
+    iframeEl.src = embedUrl;
+    iframeEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
+    iframeEl.allow = 'autoplay; fullscreen';
+    iframeEl.allowFullscreen = true;
+    document.getElementById('player-wrap').appendChild(iframeEl);
+    return;
+  }
 
   if (item.platform === 'nuuls') {
     currentPlatform = 'native';
