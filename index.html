@@ -183,6 +183,10 @@
         <div class="flabel">Twoja nazwa</div>
         <input class="finput" id="guest-name" type="text" placeholder="np. Ziomek123" maxlength="24" />
       </div>
+      <div class="fgroup">
+        <div class="flabel">Hasło</div>
+        <input class="finput" id="guest-pass" type="password" placeholder="wpisz hasło" />
+      </div>
       <div class="errmsg" id="guest-err"></div>
       <button class="btn" id="guest-btn" onclick="loginGuest()">Wejdź jako Gość →</button>
     </div>
@@ -265,7 +269,10 @@
       <div class="pl-wrap">
         <div class="pl-head">
           <div class="slbl" style="margin:0">// Playlista</div>
-          <span class="pl-count" id="pl-count">0 filmów</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="pl-count" id="pl-count">0 filmów</span>
+            <button id="clear-btn" onclick="clearPlaylist()" style="display:none;background:transparent;border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--muted);cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕ wyczyść</button>
+          </div>
         </div>
         <div id="playlist"></div>
       </div>
@@ -294,6 +301,7 @@ const db = getDatabase(app);
 
 // ── Constants ──
 const HOST_PASSWORD = 'cwel';
+const GUEST_PASSWORD = 'chuj';
 const HOST_NAME = 'MelaPustelnik';
 const ROOM_ID = 'main';
 
@@ -345,6 +353,7 @@ function detectPlatform(url) {
     const h = new URL(url).hostname.replace('www.','');
     if (h.includes('youtube.com') || h.includes('youtu.be')) return 'youtube';
     if (h.includes('i.nuuls.com') || h.includes('nuuls.com')) return 'nuuls';
+
   } catch(e) {}
   return null;
 }
@@ -389,9 +398,14 @@ window.loginHost = async function() {
 
 window.loginGuest = async function() {
   const name = document.getElementById('guest-name').value.trim();
+  const pass = document.getElementById('guest-pass').value;
   const err = document.getElementById('guest-err');
   if (!name) { err.textContent = 'Podaj nazwę użytkownika'; return; }
   if (name.toLowerCase() === HOST_NAME.toLowerCase()) { err.textContent = 'Ta nazwa jest zarezerwowana'; return; }
+  if (!pass) { err.textContent = 'Podaj hasło'; return; }
+  const hash = await sha256(pass);
+  const correctHash = await sha256(GUEST_PASSWORD);
+  if (hash !== correctHash) { err.textContent = 'Złe hasło'; return; }
   err.textContent = '';
   isHost = false; myName = name;
   myUid = 'guest_' + getUid();
@@ -409,6 +423,8 @@ function enterRoom() {
 
   // Controls visibility
   setupControls();
+  const clearBtn = document.getElementById('clear-btn');
+  if (clearBtn) clearBtn.style.display = isHost ? '' : 'none';
   clearPlayer();
 
   // Register presence
@@ -503,6 +519,7 @@ window.leaveRoom = function() {
   document.getElementById('login').style.display = 'flex';
   document.getElementById('host-pass').value = '';
   document.getElementById('guest-name').value = '';
+  document.getElementById('guest-pass').value = '';
   document.getElementById('host-err').textContent = '';
   document.getElementById('guest-err').textContent = '';
   document.getElementById('host-btn').disabled = false;
@@ -547,8 +564,10 @@ function renderPlaylist() {
   playlist.forEach((item, i) => {
     const div = document.createElement('div');
     div.className = 'pitem' + (i === currentIndex ? ' active' : '');
-    const ico = item.platform === 'youtube' ? 'ico-yt' : 'ico-nu';
-    const lbl = item.platform === 'youtube' ? 'YT' : 'NU';
+    const icoMap = { youtube:'ico-yt', nuuls:'ico-nu' };
+    const lblMap = { youtube:'YT', nuuls:'NU' };
+    const ico = icoMap[item.platform] || 'ico-nu';
+    const lbl = lblMap[item.platform] || '??';
     div.innerHTML = `
       <div class="pitem-ico ${ico}">${lbl}</div>
       <div class="pitem-info">
@@ -670,6 +689,9 @@ function clearPlayer() {
   document.getElementById('ctrl').classList.remove('show');
   document.getElementById('ph').style.display = 'flex';
 
+  const stIframe = document.getElementById('st-iframe');
+  if (stIframe) stIframe.remove();
+
   if (ytPlayer && typeof ytPlayer.destroy === 'function') {
     try { ytPlayer.destroy(); } catch(e) {}
     ytPlayer = null;
@@ -714,6 +736,7 @@ function loadPlayer(item) {
     tryCreate();
     return;
   }
+
 
   if (item.platform === 'nuuls') {
     currentPlatform = 'native';
@@ -831,10 +854,21 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mouseup', () => { dragging = false; });
 
+// ── CLEAR PLAYLIST ──
+window.clearPlaylist = async function() {
+  if (!isHost) return;
+  if (!confirm('Wyczyścić całą playlistę?')) return;
+  try {
+    await update(ref(db, 'room'), { playlist: [], currentIndex: -1, playerState: null });
+    toast('Playlista wyczyszczona', 'ok');
+  } catch(e) { toast('Błąd', 'err'); }
+};
+
 // ── KEYBOARD ──
 document.getElementById('url-inp').addEventListener('keydown', e => { if(e.key==='Enter') window.addUrl(); });
 document.getElementById('host-pass').addEventListener('keydown', e => { if(e.key==='Enter') window.loginHost(); });
 document.getElementById('guest-name').addEventListener('keydown', e => { if(e.key==='Enter') window.loginGuest(); });
+document.getElementById('guest-pass').addEventListener('keydown', e => { if(e.key==='Enter') window.loginGuest(); });
 
 </script>
 </body>
