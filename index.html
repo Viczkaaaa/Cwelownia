@@ -128,6 +128,7 @@
   .pitem-ico{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0;font-weight:700;font-family:'Space Mono',monospace;}
   .ico-yt{background:rgba(255,0,0,.15);color:#ff4444;}
   .ico-nu{background:rgba(255,165,0,.15);color:#ffa500;}
+  .ico-tw{background:rgba(100,65,165,.2);color:#9146ff;}
   .pitem-info{flex:1;min-width:0;}
   .pitem-title{font-size:0.73rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
   .pitem-url{font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -147,6 +148,13 @@
   .toast.ok{border-color:var(--accent);color:var(--accent);}
   .toast.info{border-color:var(--accent2);color:var(--accent2);}
   .toast.gone{opacity:0;transform:translateX(-50%) translateY(10px);}
+
+  /* Twitch mode: split player + chat */
+  #twitch-wrap{display:none;position:absolute;inset:0;flex-direction:row;}
+  #twitch-wrap.show{display:flex;}
+  #twitch-player-frame{flex:1;border:none;}
+  #twitch-chat-frame{width:340px;border:none;border-left:1px solid var(--border);background:var(--surface);}
+  @media(max-width:768px){#twitch-chat-frame{display:none;}}
 </style>
 </head>
 <body>
@@ -214,6 +222,10 @@
         </div>
         <div id="yt-player"></div>
         <div id="native-wrap"><video id="native-vid" playsinline></video></div>
+        <div id="twitch-wrap">
+          <iframe id="twitch-player-frame" allowfullscreen allow="autoplay; fullscreen"></iframe>
+          <iframe id="twitch-chat-frame"></iframe>
+        </div>
 
         <!-- Controls -->
         <div id="ctrl">
@@ -263,6 +275,7 @@
         <div class="sup-tags">
           <span class="stag">YouTube</span>
           <span class="stag">i.nuuls</span>
+          <span class="stag">Twitch</span>
         </div>
       </div>
 
@@ -353,6 +366,7 @@ function detectPlatform(url) {
     const h = new URL(url).hostname.replace('www.','');
     if (h.includes('youtube.com') || h.includes('youtu.be')) return 'youtube';
     if (h.includes('i.nuuls.com') || h.includes('nuuls.com')) return 'nuuls';
+    if (h.includes('twitch.tv')) return 'twitch';
 
   } catch(e) {}
   return null;
@@ -367,6 +381,7 @@ function getYtId(url) {
 function getTitle(url, platform) {
   try {
     if (platform === 'youtube') { const id = getYtId(url); return id ? 'YouTube · '+id : 'YouTube'; }
+    if (platform === 'twitch') { try { const ch = new URL(url).pathname.split('/').filter(Boolean)[0]; return '🔴 ' + ch; } catch(e) {} }
     return new URL(url).pathname.split('/').filter(Boolean).pop() || url;
   } catch(e) { return url; }
 }
@@ -555,7 +570,7 @@ window.addUrl = async function() {
   const url = inp.value.trim();
   if (!url) return;
   const platform = detectPlatform(url);
-  if (!platform) { toast('Tylko YouTube i i.nuuls!', 'err'); return; }
+  if (!platform) { toast('Tylko YouTube, i.nuuls i Twitch!', 'err'); return; }
   const item = { url, platform, title: getTitle(url, platform) };
   const newPl = [...playlist, item];
   const newIdx = playlist.length === 0 ? 0 : currentIndex;
@@ -576,8 +591,8 @@ function renderPlaylist() {
   playlist.forEach((item, i) => {
     const div = document.createElement('div');
     div.className = 'pitem' + (i === currentIndex ? ' active' : '');
-    const icoMap = { youtube:'ico-yt', nuuls:'ico-nu' };
-    const lblMap = { youtube:'YT', nuuls:'NU' };
+    const icoMap = { youtube:'ico-yt', nuuls:'ico-nu', twitch:'ico-tw' };
+    const lblMap = { youtube:'YT', nuuls:'NU', twitch:'TW' };
     const ico = icoMap[item.platform] || 'ico-nu';
     const lbl = lblMap[item.platform] || '??';
     div.innerHTML = `
@@ -697,6 +712,9 @@ function clearPlayer() {
   document.getElementById('ttime').textContent = '0:00 / 0:00';
   document.getElementById('playbtn').textContent = '▶';
   document.getElementById('native-wrap').style.display = 'none';
+  document.getElementById('twitch-wrap').classList.remove('show');
+  document.getElementById('twitch-player-frame').src = 'about:blank';
+  document.getElementById('twitch-chat-frame').src = 'about:blank';
   document.getElementById('native-vid').src = '';
   document.getElementById('ctrl').classList.remove('show');
   document.getElementById('ph').style.display = 'flex';
@@ -749,6 +767,23 @@ function loadPlayer(item) {
   }
 
 
+
+  if (item.platform === 'twitch') {
+    currentPlatform = 'twitch';
+    let channel = '';
+    try { channel = new URL(item.url).pathname.split('/').filter(Boolean)[0]; } catch(e) {}
+    if (!channel) { toast('Błąd URL Twitch','err'); return; }
+    const parent = window.location.hostname || 'localhost';
+    const tw = document.getElementById('twitch-wrap');
+    const tpf = document.getElementById('twitch-player-frame');
+    const tcf = document.getElementById('twitch-chat-frame');
+    tpf.src = `https://player.twitch.tv/?channel=${channel}&parent=${parent}&autoplay=true&muted=false`;
+    tcf.src = `https://www.twitch.tv/embed/${channel}/chat?parent=${parent}&darkpopout`;
+    tw.classList.add('show');
+    // Hide controls overlay - no sync for live
+    document.getElementById('ctrl').classList.remove('show');
+    return;
+  }
 
   if (item.platform === 'nuuls') {
     currentPlatform = 'native';
