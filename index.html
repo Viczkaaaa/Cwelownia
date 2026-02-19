@@ -191,10 +191,6 @@
         <div class="flabel">Twoja nazwa</div>
         <input class="finput" id="guest-name" type="text" placeholder="np. Ziomek123" maxlength="24" />
       </div>
-      <div class="fgroup">
-        <div class="flabel">Hasło</div>
-        <input class="finput" id="guest-pass" type="password" placeholder="wpisz hasło" />
-      </div>
       <div class="errmsg" id="guest-err"></div>
       <button class="btn" id="guest-btn" onclick="loginGuest()">Wejdź jako Gość →</button>
     </div>
@@ -314,7 +310,6 @@ const db = getDatabase(app);
 
 // ── Constants ──
 const HOST_PASSWORD = 'cwel';
-const GUEST_PASSWORD = 'chuj';
 const HOST_NAME = 'MelaPustelnik';
 const ROOM_ID = 'main';
 
@@ -411,16 +406,11 @@ window.loginHost = async function() {
   enterRoom();
 };
 
-window.loginGuest = async function() {
+window.loginGuest = function() {
   const name = document.getElementById('guest-name').value.trim();
-  const pass = document.getElementById('guest-pass').value;
   const err = document.getElementById('guest-err');
   if (!name) { err.textContent = 'Podaj nazwę użytkownika'; return; }
   if (name.toLowerCase() === HOST_NAME.toLowerCase()) { err.textContent = 'Ta nazwa jest zarezerwowana'; return; }
-  if (!pass) { err.textContent = 'Podaj hasło'; return; }
-  const hash = await sha256(pass);
-  const correctHash = await sha256(GUEST_PASSWORD);
-  if (hash !== correctHash) { err.textContent = 'Złe hasło'; return; }
   err.textContent = '';
   isHost = false; myName = name;
   myUid = 'guest_' + getUid();
@@ -546,7 +536,6 @@ window.leaveRoom = function() {
   document.getElementById('login').style.display = 'flex';
   document.getElementById('host-pass').value = '';
   document.getElementById('guest-name').value = '';
-  document.getElementById('guest-pass').value = '';
   document.getElementById('host-err').textContent = '';
   document.getElementById('guest-err').textContent = '';
   document.getElementById('host-btn').disabled = false;
@@ -915,7 +904,6 @@ window.clearPlaylist = async function() {
 document.getElementById('url-inp').addEventListener('keydown', e => { if(e.key==='Enter') window.addUrl(); });
 document.getElementById('host-pass').addEventListener('keydown', e => { if(e.key==='Enter') window.loginHost(); });
 document.getElementById('guest-name').addEventListener('keydown', e => { if(e.key==='Enter') window.loginGuest(); });
-document.getElementById('guest-pass').addEventListener('keydown', e => { if(e.key==='Enter') window.loginGuest(); });
 
 </script>
 </body>
