@@ -189,7 +189,7 @@
       <div class="card-desc">Możesz oglądać i dodawać filmy do playlisty.</div>
       <div class="fgroup">
         <div class="flabel">Twoja nazwa</div>
-        <input class="finput" id="guest-name" type="text" placeholder="nick" maxlength="24" />
+        <input class="finput" id="guest-name" type="text" placeholder="wpisz nick" maxlength="24" />
       </div>
       <div class="errmsg" id="guest-err"></div>
       <button class="btn" id="guest-btn" onclick="loginGuest()">Wejdź jako Gość →</button>
@@ -265,7 +265,7 @@
       <div class="add-box">
         <div class="slbl">// Dodaj link</div>
         <div class="add-row">
-          <input type="text" class="urlinput" id="url-inp" placeholder="Link" />
+          <input type="text" class="urlinput" id="url-inp" placeholder="link" />
           <button class="addbtn" onclick="addUrl()">+</button>
         </div>
         <div class="sup-tags">
@@ -323,6 +323,7 @@ let unsubRoom = null;
 let unsubUsers = null;
 
 // Player
+let currentVolume = 100; // track volume across players
 let ytPlayer = null;
 let currentPlatform = null; // 'youtube' | 'native'
 let isPlaying = false;
@@ -739,13 +740,17 @@ function loadPlayer(item) {
         videoId: vid,
         playerVars: { autoplay:1, rel:0, modestbranding:1, controls:0, disablekb:1, iv_load_policy:3 },
         events: {
-          onReady: e => { e.target.playVideo(); startTimers(); },
+          onReady: e => { e.target.setVolume(currentVolume); e.target.playVideo(); startTimers(); },
           onStateChange: e => {
             if (ignoreState) return;
             if (isHost) {
               const pl = e.data === window.YT.PlayerState.PLAYING;
               const pa = e.data === window.YT.PlayerState.PAUSED;
               if (pl || pa) { try { pushState(pl, ytPlayer.getCurrentTime()||0); } catch(err){} }
+              // Autoplay next
+              if (e.data === window.YT.PlayerState.ENDED && playlist.length > 1 && currentIndex < playlist.length - 1) {
+                setIdx(currentIndex + 1);
+              }
             }
           }
         }
@@ -780,9 +785,13 @@ function loadPlayer(item) {
     nw.style.display = 'flex';
     const v = document.getElementById('native-vid');
     v.src = item.url; v.controls = false;
+    v.volume = currentVolume / 100;
     v.addEventListener('play', () => { if (!ignoreState && isHost) pushState(true, v.currentTime); });
     v.addEventListener('pause', () => { if (!ignoreState && isHost) pushState(false, v.currentTime); });
     v.addEventListener('seeked', () => { if (!ignoreState && isHost) pushState(!v.paused, v.currentTime); });
+    v.addEventListener('ended', () => {
+      if (isHost && playlist.length > 1 && currentIndex < playlist.length - 1) setIdx(currentIndex + 1);
+    });
     v.play().catch(()=>{});
     startTimers();
     return;
@@ -856,10 +865,10 @@ window.seekRel = function(sec) {
 };
 
 window.setVol = function(val) {
-  const v = parseInt(val);
-  if (currentPlatform === 'youtube' && ytPlayer) ytPlayer.setVolume(v);
+  currentVolume = parseInt(val);
+  if (currentPlatform === 'youtube' && ytPlayer) ytPlayer.setVolume(currentVolume);
   else if (currentPlatform === 'native') {
-    const vid = document.getElementById('native-vid'); if (vid) vid.volume = v/100;
+    const vid = document.getElementById('native-vid'); if (vid) vid.volume = currentVolume/100;
   }
 };
 
