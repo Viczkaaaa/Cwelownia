@@ -667,6 +667,10 @@ async function pushState(playing, time) {
   }, 150);
 }
 
+let progressTimer = null;
+function startProgressTimer() { clearInterval(progressTimer); progressTimer = setInterval(updateProgress, 500); }
+function stopProgressTimer() { clearInterval(progressTimer); progressTimer = null; }
+
 function startHeartbeat() {
   clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
@@ -719,18 +723,22 @@ function applyState(state, force = false) {
 // ── Clear Player ──
 function clearPlayer() {
   clearInterval(heartbeatTimer);
-  currentPlatform = null;
+  stopProgressTimer();
+  clearInterval(window._ytInfoTimer);
+  if (window._ytMsgHandler) { window.removeEventListener('message', window._ytMsgHandler); window._ytMsgHandler = null; }
+  currentPlatform = null; ytIframe = null; ytCurrentTime = 0; ytDuration = 0;
   document.getElementById('pause-overlay').classList.remove('on');
+  document.getElementById('ctrl-overlay').classList.remove('show');
   document.getElementById('native-wrap').style.display = 'none';
   document.getElementById('native-vid').src = '';
   document.getElementById('placeholder').style.display = 'flex';
-
+  const pf = document.getElementById('prog-fill'); if (pf) pf.style.width = '0%';
+  const tt = document.getElementById('ttime'); if (tt) tt.textContent = '0:00 / 0:00';
+  const pb = document.getElementById('play-btn'); if (pb) pb.textContent = '▶';
+  document.getElementById('yt-player').innerHTML = '';
   if (ytPlayer && typeof ytPlayer.destroy === 'function') {
     try { ytPlayer.destroy(); } catch(e) {}
     ytPlayer = null;
-    const old = document.getElementById('yt-player');
-    const fresh = document.createElement('div'); fresh.id = 'yt-player';
-    old.replaceWith(fresh);
   }
 }
 
@@ -743,49 +751,39 @@ function loadPlayer(item) {
     currentPlatform = 'youtube';
     const vid = getYtId(item.url);
     if (!vid) { toast('Błąd ID YouTube','err'); return; }
-    const iframe = document.createElement('iframe');
-    iframe.id = 'yt-iframe';
-    iframe.src = `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
-    iframe.allow = 'autoplay; fullscreen; encrypted-media';
-    iframe.allowFullscreen = true;
-    iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
-    document.getElementById('yt-player').appendChild(iframe);
-    ytIframe = iframe;
-    if (window._ytMsgHandler) window.removeEventListener('message', window._ytMsgHandler);
-    window._ytMsgHandler = function(e) {
-      if (!ytIframe || e.source !== ytIframe.contentWindow) return;
-      try {
-        const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        if (d.event === 'onStateChange') {
-          const playing = d.info === 1;
-          const paused = d.info === 2;
-          const ended = d.info === 0;
-          if (playing || paused) {
+    const tryCreate = () => {
+      if (!window.YT || !window.YT.Player) { setTimeout(tryCreate, 200); return; }
+      ytPlayer = new window.YT.Player('yt-player', {
+        videoId: vid,
+        playerVars: { autoplay: 1, rel: 0, modestbranding: 1, controls: 1, iv_load_policy: 3 },
+        events: {
+          onReady: e => {
+            e.target.playVideo();
+            startHeartbeat();
+            startProgressTimer();
+          },
+          onStateChange: e => {
+            if (ignoreState) return;
+            const playing = e.data === 1;
+            const paused = e.data === 2;
+            const ended = e.data === 0;
+            document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
             document.getElementById('pause-overlay').classList.toggle('on', paused);
-            if (isHost) pushState(playing, ytCurrentTime);
-            else if (paused && pauseLocked) {
-              setTimeout(() => { if (ytIframe) ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'playVideo',args:''}), '*'); }, 100);
+            if (isHost) {
+              if (playing || paused) pushState(playing, ytPlayer.getCurrentTime()||0);
+              if (ended && currentIndex < playlist.length-1) setIdx(currentIndex+1);
+            } else {
+              // Guest tried to pause but locked — force resume
+              if (paused && pauseLocked) {
+                setTimeout(() => { try { ytPlayer.playVideo(); } catch(err){} }, 150);
+              }
             }
           }
-          if (ended && isHost && currentIndex < playlist.length - 1) setIdx(currentIndex + 1);
         }
-        if (d.event === 'infoDelivery' && d.info) {
-          if (d.info.currentTime !== undefined) ytCurrentTime = d.info.currentTime;
-          if (d.info.duration !== undefined) ytDuration = d.info.duration;
-          updateProgress();
-          document.getElementById('play-btn').textContent = (d.info.playerState === 1) ? '⏸' : '▶';
-        }
-      } catch(err) {}
+      });
     };
-    window.addEventListener('message', window._ytMsgHandler);
-    clearInterval(window._ytInfoTimer);
-    window._ytInfoTimer = setInterval(() => {
-      if (ytIframe && ytIframe.contentWindow) {
-        ytIframe.contentWindow.postMessage(JSON.stringify({event:'listening',id:1}), '*');
-      }
-    }, 500);
+    tryCreate();
     document.getElementById('ctrl-overlay').classList.add('show');
-    startHeartbeat();
     return;
   }
 
@@ -812,8 +810,11 @@ function loadPlayer(item) {
 // ── Progress & Controls ──
 function updateProgress() {
   let ct = 0, dur = 0;
-  if (currentPlatform === 'youtube') { ct = ytCurrentTime; dur = ytDuration; }
-  else if (currentPlatform === 'native') {
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    try { ct = ytPlayer.getCurrentTime()||0; dur = ytPlayer.getDuration()||0; } catch(e){}
+    const btn = document.getElementById('play-btn');
+    try { if (btn) btn.textContent = ytPlayer.getPlayerState()===1 ? '⏸' : '▶'; } catch(e){}
+  } else if (currentPlatform === 'native') {
     const v = document.getElementById('native-vid');
     if (v) { ct = v.currentTime||0; dur = v.duration||0; }
   }
@@ -830,10 +831,8 @@ function fmt(s) {
 }
 
 window.ctrlPlay = function() {
-  if (currentPlatform === 'youtube' && ytIframe) {
-    const btn = document.getElementById('play-btn');
-    const cmd = btn.textContent === '⏸' ? 'pauseVideo' : 'playVideo';
-    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:cmd,args:''}), '*');
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    try { if (ytPlayer.getPlayerState()===1) ytPlayer.pauseVideo(); else ytPlayer.playVideo(); } catch(e){}
   } else if (currentPlatform === 'native') {
     const v = document.getElementById('native-vid');
     if (v) { if (v.paused) v.play(); else v.pause(); }
@@ -841,11 +840,12 @@ window.ctrlPlay = function() {
 };
 
 window.ctrlSeek = function(sec) {
-  if (currentPlatform === 'youtube' && ytIframe) {
-    const t = Math.max(0, ytCurrentTime + sec);
-    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[t,true]}), '*');
-    ytCurrentTime = t; updateProgress();
-    if (isHost) pushState(true, t);
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    try {
+      const t = Math.max(0, (ytPlayer.getCurrentTime()||0) + sec);
+      ytPlayer.seekTo(t, true);
+      if (isHost) pushState(ytPlayer.getPlayerState()===1, t);
+    } catch(e){}
   } else if (currentPlatform === 'native') {
     const v = document.getElementById('native-vid'); if (!v) return;
     v.currentTime = Math.max(0, v.currentTime + sec);
@@ -855,8 +855,7 @@ window.ctrlSeek = function(sec) {
 
 window.ctrlVol = function(val) {
   const v = parseInt(val);
-  if (currentPlatform === 'youtube' && ytIframe)
-    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[v]}), '*');
+  if (currentPlatform === 'youtube' && ytPlayer) { try { ytPlayer.setVolume(v); } catch(e){} }
   else if (currentPlatform === 'native') {
     const vid = document.getElementById('native-vid'); if (vid) vid.volume = v/100;
   }
@@ -873,9 +872,8 @@ function _seekFrac(f) {
   const dur = currentPlatform === 'youtube' ? ytDuration : (document.getElementById('native-vid')?.duration||0);
   if (dur <= 0) return;
   const t = f * dur;
-  if (currentPlatform === 'youtube' && ytIframe) {
-    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[t,true]}), '*');
-    ytCurrentTime = t; updateProgress(); if (isHost) pushState(true, t);
+  if (currentPlatform === 'youtube' && ytPlayer) {
+    try { ytPlayer.seekTo(t, true); if (isHost) pushState(ytPlayer.getPlayerState()===1, t); } catch(e){}
   } else if (currentPlatform === 'native') {
     const v = document.getElementById('native-vid'); if (v) { v.currentTime = t; if (isHost) pushState(!v.paused, t); }
   }
