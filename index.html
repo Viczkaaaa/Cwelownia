@@ -146,9 +146,47 @@ header {
 #native-wrap { position: absolute; inset: 0; display: none; background: #000; align-items: center; justify-content: center; }
 #native-wrap video { max-width: 100%; max-height: 100%; }
 
-/* click blocker for guests */
-#click-blocker { position: absolute; inset: 0; z-index: 8; display: none; }
-#click-blocker.on { display: block; }
+/* custom controls overlay */
+#ctrl-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  padding: 28px 14px 12px;
+  display: none; flex-direction: column; gap: 7px;
+  z-index: 10;
+}
+#ctrl-overlay.show { display: flex; }
+.player-wrap:hover #ctrl-overlay { opacity: 1; }
+
+.prog-row { display: flex; align-items: center; gap: 8px; }
+.prog-bg {
+  flex: 1; height: 4px; background: rgba(255,255,255,0.2);
+  border-radius: 2px; cursor: pointer; position: relative; transition: height 0.15s;
+}
+.prog-bg:hover { height: 6px; }
+.prog-fill { height: 100%; background: var(--accent); border-radius: 2px; pointer-events: none; }
+.prog-thumb {
+  position: absolute; right: 0; top: 50%; transform: translate(50%,-50%);
+  width: 11px; height: 11px; background: var(--accent); border-radius: 50%;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.prog-bg:hover .prog-thumb { opacity: 1; }
+.ttime { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: rgba(255,255,255,0.75); white-space: nowrap; min-width: 74px; text-align: right; }
+
+.ctrl-row { display: flex; align-items: center; gap: 5px; }
+.cb {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 5px; padding: 5px 10px; color: #fff;
+  font-family: 'Space Mono', monospace; font-size: 0.67rem;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.cb:hover { background: rgba(232,232,232,0.18); border-color: var(--accent); color: var(--accent); }
+.cb.play-btn { padding: 5px 14px; font-size: 0.9rem; }
+.vol-wrap { display: flex; align-items: center; gap: 5px; margin-left: 2px; }
+.vol { -webkit-appearance: none; appearance: none; width: 68px; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; outline: none; cursor: pointer; }
+.vol::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+.spacer { flex: 1; }
+.fs-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; padding: 5px 9px; color: #fff; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.fs-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* pause overlay */
 #pause-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: none; align-items: center; justify-content: center; z-index: 7; pointer-events: none; flex-direction: column; gap: 8px; }
@@ -156,10 +194,6 @@ header {
 .po-icon { font-size: 3.5rem; opacity: 0.85; }
 .po-txt { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: rgba(255,255,255,0.65); letter-spacing: 0.12em; }
 
-.now-bar { background: var(--surface2); border-top: 1px solid var(--border); padding: 9px 16px; display: flex; align-items: center; gap: 9px; min-height: 42px; flex-shrink: 0; }
-.now-lbl { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
-.now-txt { font-size: 0.77rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.now-empty { color: var(--muted); }
 
 /* ── SIDEBAR ── */
 .sidebar { display: flex; flex-direction: column; background: var(--surface); overflow: hidden; min-height: 0; }
@@ -261,13 +295,31 @@ header {
         </div>
         <div id="yt-player"></div>
         <div id="native-wrap"><video id="native-vid" playsinline controls></video></div>
-        <div id="click-blocker"></div>
         <div id="pause-overlay"><div class="po-icon">⏸</div><div class="po-txt">PAUZA</div></div>
+        <div id="ctrl-overlay">
+          <div class="prog-row">
+            <div class="prog-bg" id="prog-bg">
+              <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+              <div class="prog-thumb"></div>
+            </div>
+            <span class="ttime" id="ttime">0:00 / 0:00</span>
+          </div>
+          <div class="ctrl-row">
+            <button class="cb play-btn" id="play-btn" onclick="ctrlPlay()">▶</button>
+            <button class="cb" onclick="ctrlSeek(-10)">«10s</button>
+            <button class="cb" onclick="ctrlSeek(-5)">«5s</button>
+            <button class="cb" onclick="ctrlSeek(5)">5s»</button>
+            <button class="cb" onclick="ctrlSeek(10)">10s»</button>
+            <div class="vol-wrap">
+              <span style="font-size:0.75rem;opacity:0.7">🔊</span>
+              <input type="range" class="vol" id="vol-inp" min="0" max="100" value="100" oninput="ctrlVol(this.value)">
+            </div>
+            <div class="spacer"></div>
+            <button class="fs-btn" onclick="ctrlFs()">⛶</button>
+          </div>
+        </div>
       </div>
-      <div class="now-bar">
-        <span class="now-lbl">▶ Teraz</span>
-        <span class="now-txt now-empty" id="now-txt">Nic nie jest odtwarzane</span>
-      </div>
+
     </div>
 
     <!-- Sidebar -->
@@ -324,7 +376,8 @@ let isHost = false, myName = '', myUid = null;
 let playlist = [], currentIndex = -1;
 let pauseLocked = false, addLocked = false;
 let unsubRoom = null, unsubUsers = null;
-let ytPlayer = null, currentPlatform = null;
+let ytPlayer = null, ytIframe = null, currentPlatform = null;
+let ytCurrentTime = 0, ytDuration = 0;
 let ignoreState = false, lastSyncedState = null;
 let syncDebounce = null, heartbeatTimer = null;
 
@@ -643,8 +696,8 @@ function applyState(state, force = false) {
   const drift = Math.abs(guestTime - target);
   if (!force && drift <= 3 && playing) return;
 
-  // Update pause overlay
   document.getElementById('pause-overlay').classList.toggle('on', !playing);
+  document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
 
   ignoreState = true;
   if (currentPlatform === 'youtube' && ytPlayer && typeof ytPlayer.seekTo === 'function') {
@@ -668,12 +721,9 @@ function clearPlayer() {
   clearInterval(heartbeatTimer);
   currentPlatform = null;
   document.getElementById('pause-overlay').classList.remove('on');
-  document.getElementById('click-blocker').classList.remove('on');
   document.getElementById('native-wrap').style.display = 'none';
   document.getElementById('native-vid').src = '';
   document.getElementById('placeholder').style.display = 'flex';
-  const np = document.getElementById('now-txt');
-  np.textContent = 'Nic nie jest odtwarzane'; np.className = 'now-txt now-empty';
 
   if (ytPlayer && typeof ytPlayer.destroy === 'function') {
     try { ytPlayer.destroy(); } catch(e) {}
@@ -688,40 +738,54 @@ function clearPlayer() {
 function loadPlayer(item) {
   clearPlayer();
   document.getElementById('placeholder').style.display = 'none';
-  const np = document.getElementById('now-txt');
-  np.textContent = item.title; np.className = 'now-txt';
 
   if (item.platform === 'youtube') {
     currentPlatform = 'youtube';
     const vid = getYtId(item.url);
     if (!vid) { toast('Błąd ID YouTube','err'); return; }
-    const tryCreate = () => {
-      if (!window.YT || !window.YT.Player) { setTimeout(tryCreate, 200); return; }
-      ytPlayer = new window.YT.Player('yt-player', {
-        videoId: vid,
-        playerVars: { autoplay: 1, rel: 0, modestbranding: 1 },
-        events: {
-          onReady: e => { e.target.playVideo(); startHeartbeat(); },
-          onStateChange: e => {
-            if (ignoreState) return;
-            if (isHost) {
-              const pl = e.data === window.YT.PlayerState.PLAYING;
-              const pa = e.data === window.YT.PlayerState.PAUSED;
-              if (pl || pa) {
-                document.getElementById('pause-overlay').classList.toggle('on', pa);
-                try { pushState(pl, ytPlayer.getCurrentTime()||0); } catch(err){}
-              }
-              if (e.data === window.YT.PlayerState.ENDED && currentIndex < playlist.length - 1) {
-                setIdx(currentIndex + 1);
-              }
+    const iframe = document.createElement('iframe');
+    iframe.id = 'yt-iframe';
+    iframe.src = `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+    iframe.allow = 'autoplay; fullscreen; encrypted-media';
+    iframe.allowFullscreen = true;
+    iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
+    document.getElementById('yt-player').appendChild(iframe);
+    ytIframe = iframe;
+    if (window._ytMsgHandler) window.removeEventListener('message', window._ytMsgHandler);
+    window._ytMsgHandler = function(e) {
+      if (!ytIframe || e.source !== ytIframe.contentWindow) return;
+      try {
+        const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (d.event === 'onStateChange') {
+          const playing = d.info === 1;
+          const paused = d.info === 2;
+          const ended = d.info === 0;
+          if (playing || paused) {
+            document.getElementById('pause-overlay').classList.toggle('on', paused);
+            if (isHost) pushState(playing, ytCurrentTime);
+            else if (paused && pauseLocked) {
+              setTimeout(() => { if (ytIframe) ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'playVideo',args:''}), '*'); }, 100);
             }
           }
+          if (ended && isHost && currentIndex < playlist.length - 1) setIdx(currentIndex + 1);
         }
-      });
-      // Block guest clicks on YT
-      if (!isHost) document.getElementById('click-blocker').classList.add('on');
+        if (d.event === 'infoDelivery' && d.info) {
+          if (d.info.currentTime !== undefined) ytCurrentTime = d.info.currentTime;
+          if (d.info.duration !== undefined) ytDuration = d.info.duration;
+          updateProgress();
+          document.getElementById('play-btn').textContent = (d.info.playerState === 1) ? '⏸' : '▶';
+        }
+      } catch(err) {}
     };
-    tryCreate();
+    window.addEventListener('message', window._ytMsgHandler);
+    clearInterval(window._ytInfoTimer);
+    window._ytInfoTimer = setInterval(() => {
+      if (ytIframe && ytIframe.contentWindow) {
+        ytIframe.contentWindow.postMessage(JSON.stringify({event:'listening',id:1}), '*');
+      }
+    }, 500);
+    document.getElementById('ctrl-overlay').classList.add('show');
+    startHeartbeat();
     return;
   }
 
@@ -745,15 +809,86 @@ function loadPlayer(item) {
   }
 }
 
+// ── Progress & Controls ──
+function updateProgress() {
+  let ct = 0, dur = 0;
+  if (currentPlatform === 'youtube') { ct = ytCurrentTime; dur = ytDuration; }
+  else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid');
+    if (v) { ct = v.currentTime||0; dur = v.duration||0; }
+  }
+  const pct = dur > 0 ? (ct/dur)*100 : 0;
+  const pf = document.getElementById('prog-fill');
+  const tt = document.getElementById('ttime');
+  if (pf) pf.style.width = pct + '%';
+  if (tt) tt.textContent = fmt(ct) + ' / ' + fmt(dur);
+}
+
+function fmt(s) {
+  if (!isFinite(s)||s<0) return '0:00';
+  return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+}
+
+window.ctrlPlay = function() {
+  if (currentPlatform === 'youtube' && ytIframe) {
+    const btn = document.getElementById('play-btn');
+    const cmd = btn.textContent === '⏸' ? 'pauseVideo' : 'playVideo';
+    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:cmd,args:''}), '*');
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid');
+    if (v) { if (v.paused) v.play(); else v.pause(); }
+  }
+};
+
+window.ctrlSeek = function(sec) {
+  if (currentPlatform === 'youtube' && ytIframe) {
+    const t = Math.max(0, ytCurrentTime + sec);
+    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[t,true]}), '*');
+    ytCurrentTime = t; updateProgress();
+    if (isHost) pushState(true, t);
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid'); if (!v) return;
+    v.currentTime = Math.max(0, v.currentTime + sec);
+    if (isHost) pushState(!v.paused, v.currentTime);
+  }
+};
+
+window.ctrlVol = function(val) {
+  const v = parseInt(val);
+  if (currentPlatform === 'youtube' && ytIframe)
+    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[v]}), '*');
+  else if (currentPlatform === 'native') {
+    const vid = document.getElementById('native-vid'); if (vid) vid.volume = v/100;
+  }
+};
+
+window.ctrlFs = function() {
+  const w = document.getElementById('player-wrap');
+  document.fullscreenElement ? document.exitFullscreen() : w.requestFullscreen().catch(()=>{});
+};
+
+const progBg = document.getElementById('prog-bg');
+let _drag = false;
+function _seekFrac(f) {
+  const dur = currentPlatform === 'youtube' ? ytDuration : (document.getElementById('native-vid')?.duration||0);
+  if (dur <= 0) return;
+  const t = f * dur;
+  if (currentPlatform === 'youtube' && ytIframe) {
+    ytIframe.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[t,true]}), '*');
+    ytCurrentTime = t; updateProgress(); if (isHost) pushState(true, t);
+  } else if (currentPlatform === 'native') {
+    const v = document.getElementById('native-vid'); if (v) { v.currentTime = t; if (isHost) pushState(!v.paused, t); }
+  }
+}
+progBg.addEventListener('mousedown', e => { _drag=true; const r=progBg.getBoundingClientRect(); _seekFrac(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))); });
+document.addEventListener('mousemove', e => { if(!_drag)return; const r=progBg.getBoundingClientRect(); _seekFrac(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))); });
+document.addEventListener('mouseup', ()=>{ _drag=false; });
+
 // ── Keyboard ──
 document.getElementById('url-inp').addEventListener('keydown', e => { if(e.key==='Enter') window.addUrl(); });
 document.getElementById('host-pass').addEventListener('keydown', e => { if(e.key==='Enter') window.loginHost(); });
 document.getElementById('guest-name').addEventListener('keydown', e => { if(e.key==='Enter') window.loginGuest(); });
 
-// Block spacebar for guests on YT
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !isHost && currentPlatform === 'youtube' && document.activeElement.tagName !== 'INPUT') e.preventDefault();
-});
 
 // ── Init ──
 window.addEventListener('load', () => {
