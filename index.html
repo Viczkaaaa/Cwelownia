@@ -277,7 +277,7 @@ header {
     <span class="dot"></span>
     <div class="users-row" id="users-row"></div>
     <div class="hbtns" id="host-btns" style="display:none">
-      <button class="hbtn" id="btn-pause-lock" onclick="togglePauseLock()">🔓 Pauza</button>
+      <button class="hbtn" id="btn-pause-lock" onclick="togglePauseLock()">🔓 Kontrola</button>
       <button class="hbtn" id="btn-add-lock" onclick="toggleAddLock()">🔓 Dodawanie</button>
     </div>
     <div class="hbtns">
@@ -490,7 +490,7 @@ function enterRoom() {
     // Pause lock changed
     if (newPause !== pauseLocked) {
       pauseLocked = newPause;
-      document.getElementById('btn-pause-lock').textContent = pauseLocked ? '🔒 Pauza' : '🔓 Pauza';
+      document.getElementById('btn-pause-lock').textContent = pauseLocked ? '🔒 Kontrola' : '🔓 Kontrola';
       document.getElementById('btn-pause-lock').classList.toggle('active', pauseLocked);
     }
 
@@ -655,7 +655,7 @@ async function delItem(i) {
 
 // ── Player State Sync ──
 async function pushState(playing, time) {
-  if (!isHost) return;
+  if (!isHost && pauseLocked) return;
   clearTimeout(syncDebounce);
   syncDebounce = setTimeout(async () => {
     try {
@@ -674,7 +674,7 @@ function stopProgressTimer() { clearInterval(progressTimer); progressTimer = nul
 function startHeartbeat() {
   clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
-    if (!isHost) return;
+    if (!isHost && pauseLocked) return;
     let playing = false, time = 0;
     if (currentPlatform === 'youtube' && ytPlayer) {
       try { playing = ytPlayer.getPlayerState() === 1; time = ytPlayer.getCurrentTime() || 0; } catch(e) {}
@@ -687,7 +687,7 @@ function startHeartbeat() {
 }
 
 function applyState(state, force = false) {
-  if (!state || isHost) return;
+  if (!state) return;
   const { playing, time, updatedAt, itemIndex } = state;
   if (typeof itemIndex === 'number' && itemIndex !== currentIndex) return;
   const lag = (Date.now() - (updatedAt || Date.now())) / 1000;
@@ -769,15 +769,14 @@ function loadPlayer(item) {
             const ended = e.data === 0;
             document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
             document.getElementById('pause-overlay').classList.toggle('on', paused);
-            if (isHost) {
-              if (playing || paused) pushState(playing, ytPlayer.getCurrentTime()||0);
-              if (ended && currentIndex < playlist.length-1) setIdx(currentIndex+1);
-            } else {
-              // Guest tried to pause but locked — force resume
-              if (paused && pauseLocked) {
+            if (playing || paused) {
+              if (!pauseLocked || isHost) {
+                pushState(playing, ytPlayer.getCurrentTime()||0);
+              } else if (paused && !isHost) {
                 setTimeout(() => { try { ytPlayer.playVideo(); } catch(err){} }, 150);
               }
             }
+            if (ended && isHost && currentIndex < playlist.length-1) setIdx(currentIndex+1);
           }
         }
       });
@@ -795,15 +794,23 @@ function loadPlayer(item) {
     v.src = item.url;
     v.addEventListener('play', () => {
       if (pauseLocked && !isHost) { v.pause(); return; }
-      if (!ignoreState && isHost) { pushState(true, v.currentTime); document.getElementById('pause-overlay').classList.remove('on'); }
+      document.getElementById('play-btn').textContent = '⏸';
+      document.getElementById('pause-overlay').classList.remove('on');
+      if (!ignoreState) pushState(true, v.currentTime);
     });
     v.addEventListener('pause', () => {
-      if (!ignoreState && isHost) { pushState(false, v.currentTime); document.getElementById('pause-overlay').classList.add('on'); }
+      if (pauseLocked && !isHost) return;
+      document.getElementById('play-btn').textContent = '▶';
+      document.getElementById('pause-overlay').classList.add('on');
+      if (!ignoreState) pushState(false, v.currentTime);
     });
-    v.addEventListener('seeked', () => { if (!ignoreState && isHost) pushState(!v.paused, v.currentTime); });
+    v.addEventListener('timeupdate', updateProgress);
+    v.addEventListener('seeked', () => { if (!ignoreState) pushState(!v.paused, v.currentTime); });
     v.addEventListener('ended', () => { if (isHost && currentIndex < playlist.length-1) setIdx(currentIndex+1); });
     v.play().catch(()=>{});
     startHeartbeat();
+    startProgressTimer();
+    document.getElementById('ctrl-overlay').classList.add('show');
   }
 }
 
